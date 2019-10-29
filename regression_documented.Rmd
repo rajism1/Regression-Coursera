@@ -1,0 +1,113 @@
+---
+title: "Analyzing Transmission impact on MPG"
+author: "Raj Kumar"
+date: "10/29/2019"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+##Loading Important Libraries and datasets
+
+#Loading Libraries
+library(randomForest)
+library(datasets)
+library(car)
+library(caret)
+
+#loading dataset
+car_data <- mtcars
+
+```
+
+## Preparing data
+
+*Checking if NAs value are present in the dataset  
+*Checking if any outliers exist and if it exist then impute it with mean values.  
+
+
+```{r, echo=TRUE}
+#looking at summary of the variables
+summary(car_data)
+```
+We can see that is no NAs in the dataset
+
+```{r, echo=TRUE}
+##Checking distribution of MPG for each transmission type
+boxplot(car_data$mpg~car_data$am, ylab = "Miles/Gallon", xlab = "Transmission Type")
+
+#Checking if outliers exists
+par(mfrow = c(2,2))
+boxplot(car_data$mpg)
+boxplot(car_data$disp)
+boxplot(car_data$drat)
+boxplot(car_data$qsec) 
+par(mfrow = c(1,2))
+boxplot(car_data$wt)  
+boxplot(car_data$hp)
+
+```
+
+Found some outliers in qsec,wt and hp  
+Imputing outliers with mean value
+
+```{r, echo=TRUE}
+car_data[which(car_data$hp >(quantile(mtcars$hp,0.75) + 1.5*(IQR(mtcars$hp)))),c("hp")] <- mean(car_data$hp)
+car_data[which(car_data$qsec >(quantile(mtcars$qsec,0.75) + 1.5*(IQR(mtcars$qsec)))),c("qsec")] <- mean(car_data$qsec)
+car_data[which(car_data$wt >(quantile(mtcars$wt,0.75) + 1.5*(IQR(mtcars$wt)))),c("wt")] <- mean(car_data$wt)
+```
+
+## Fitting Model
+
+Checking if Transmission Affect MPG
+
+```{r , echo=TRUE}
+##Fitting a regression model
+model <- lm(mpg ~ am , data = car_data)
+summary(model)
+confint(model)
+```
+
+Looking at the summary we can say that difference is significant with confidence of 95%  as p value is 0.000285 (p<0.001).  
+Also R-Square value is 0.36 which means that only 36 % of the model is explained by transmission.  
+That means there are other variables which is also impacting the MPG of the car  
+
+```{r , echo=TRUE}
+ 
+##Checking Impact of other variables on the MPG
+model_mul <- lm(mpg ~ . , data = car_data)
+summary(model_mul)
+
+##Checking for multicollinearity
+vif(model_mul)
+##Removing Cyl as it has a high variable inflation factor
+
+##Using Step function to get the most important variable
+model_step<-step(model_mul,direction = "both")
+```
+
+Including am and the variables suggested by step function
+
+```{r , echo=TRUE}
+model_final <- lm(mpg ~ disp + wt + carb + am, data = car_data)
+summary(model_final)
+```
+
+Now we can see that  model can explain about 85 % of the variance due to 4 variables.
+
+## Model Diagnostics
+Comparing the two models and checking the Residual plots
+
+```{r , echo=TRUE}
+##Comparing the two models
+anova(model,model_final)
+
+
+#####looking at residual plots
+par(mfrow = c(2,2))
+plot(model_final)
+```
+
+the plot looks good.  
+residuals are randomly distributed 
